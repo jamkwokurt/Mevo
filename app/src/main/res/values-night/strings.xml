@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="welcomeMsg">Hi, there!</string>
+    <string name="show_map">Show Map</string>
+    <string name="mapbox_access_token">pk.eyJ1IjoiamFta3dvayIsImEiOiJja3ptYms1NWQ1ZGE3MndtemR0bzd4ejJ6In0.b8WxBqA35ERQhxAeeAS04w</string>
+</resources>
