@@ -12,7 +12,7 @@ public interface MevoApi {
     String wgnParking = "parking/wellington";
     String BASE_URL = "https://api.mevo.co.nz/public/";
     @GET(wgnVehicles)
-    Call<MevoResponse> getWellingtonVehicles();
+    Call<JsonObject> getWellingtonVehicles();
     @GET(wgnParking)
-    Call<MevoResponse> getWellingtonParking();
+    Call<JsonObject> getWellingtonParking();
 }
