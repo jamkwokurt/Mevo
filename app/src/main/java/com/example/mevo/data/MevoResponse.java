@@ -1,23 +1,19 @@
 package com.example.mevo.data;
 
+import com.google.gson.JsonObject;
+import com.google.gson.annotations.SerializedName;
+
+//@JsonClass(generateAdapter = true)
 public class MevoResponse {
-    String type;
+    @SerializedName("data")
     MevoData data;
 
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
+    public MevoResponse(MevoData data){
+        this.data = data;
     }
 
     public MevoData getData() {
         return data;
-    }
-
-    public void setData(MevoData data) {
-        this.data = data;
     }
 
 }

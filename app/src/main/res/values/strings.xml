@@ -6,7 +6,7 @@
     <string name="showParking">Show Parking</string>
     <string name="hideVehicles">Hide Vehicles</string>
     <string name="hideParking">Hide Parking</string>
-    <string name="mapbox_access_token">pk.eyJ1IjoiamFta3dvayIsImEiOiJja3ptYms1NWQ1ZGE3MndtemR0bzd4ejJ6In0.b8WxBqA35ERQhxAeeAS04w</string>
+    <string name="mapbox_access_token">pk.eyJ1IjoiamFta3dvayIsImEiOiJjbDA1cnlueHAwcnU3M2Nxd2VndnV3bzlhIn0.1YDZzjIaH-wA7IEUOYh8Wg</string>
     <string name="tap_on_map_instruction">Tap anywhere on the map</string>
     <string name="user_location_permission_explanation">This app needs location permissions in order to show its functionality.</string>
     <string name="user_location_permission_not_granted">You didn\'t grant location permissions.</string>

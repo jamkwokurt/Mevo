@@ -1,35 +1,24 @@
 package com.example.mevo.data;
 
+
+import com.google.gson.JsonObject;
+import com.google.gson.annotations.SerializedName;
 import com.mapbox.geojson.Feature;
 
 import java.util.List;
 
 public class MevoData {
-    String type;
-    List<Feature> vehicleFeatures;
-    Feature parkingFeature;
+    @SerializedName("features")
+    List<JsonObject> features;
 
-    public String getType() {
-        return type;
+    @SerializedName("geometry")
+    JsonObject geometry;
+
+    public List<JsonObject> getVehicleFeatures() {
+        return features;
     }
 
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public List<Feature> getVehicleFeatures() {
-        return vehicleFeatures;
-    }
-
-    public void setVehicleFeatures(List<Feature> vehicleFeatures) {
-        this.vehicleFeatures = vehicleFeatures;
-    }
-
-    public Feature getParkingFeature() {
-        return parkingFeature;
-    }
-
-    public void setParkingFeature(Feature parkingFeature) {
-        this.parkingFeature = parkingFeature;
+    public JsonObject getParkingGeometry() {
+        return geometry;
     }
 }

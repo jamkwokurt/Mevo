@@ -21,32 +21,28 @@ import com.mapbox.geojson.Point;
 import com.mapbox.geojson.Polygon;
 import com.mapbox.mapboxsdk.maps.Style;
 import com.mapbox.mapboxsdk.style.layers.FillLayer;
-import com.mapbox.mapboxsdk.style.layers.Layer;
 import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
-import com.squareup.moshi.Moshi;
-
 import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
-import retrofit2.converter.moshi.MoshiConverterFactory;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiFetcher {
 
     private final MevoApi mevoApi;
     public static final String VEHICLE_SOURCE_ID = "geojson-source-vehicle";
     public static final String PARKING_SOURCE_ID = "geojson-source-parking";
-    public static final String VEHICLE_LAYER_ID = "parking-layer";
+    public static final String VEHICLE_LAYER_ID = "vehicle-layer";
     public static final String PARKING_LAYER_ID = "parking-layer";
 
     public ApiFetcher(){
-        Moshi moshi = new Moshi.Builder().build();
         Retrofit retrofit = new Retrofit.Builder().baseUrl(MevoApi.BASE_URL)
-                .addConverterFactory(MoshiConverterFactory.create(moshi))
+                .addConverterFactory(GsonConverterFactory.create())
                 .build();
         this.mevoApi = retrofit.create(MevoApi.class);
     }
@@ -57,8 +53,9 @@ public class ApiFetcher {
             @Override
             public void onResponse(@NonNull Call<MevoResponse> call, @NonNull Response<MevoResponse> response) {
                 if (response.isSuccessful()) {
-                    List<Feature>vehicleFeatures = response.body().getData().getVehicleFeatures();
-                    FeatureCollection vehicleCollection = FeatureCollection.fromFeatures(vehicleFeatures);
+                    MevoResponse mevoResponse = response.body();
+                    String data = mevoResponse.getData().toString();
+                    FeatureCollection vehicleCollection = FeatureCollection.fromJson(data);
                     if (vehicleCollection.features() != null) {
                         for (Feature vehicle : vehicleCollection.features()) {
                             if (vehicle.geometry() instanceof Point) {
@@ -105,7 +102,9 @@ public class ApiFetcher {
             @Override
             public void onResponse(@NonNull Call<MevoResponse> call, @NonNull Response<MevoResponse> response) {
                 if (response.isSuccessful()) {
-                    Feature feature = response.body().getData().getParkingFeature();
+                    MevoResponse mevoResponse = response.body();
+                    String data = mevoResponse.getData().toString();
+                    Feature feature = Feature.fromJson(data);
                     if (feature.geometry() instanceof Polygon) {
                         Polygon parking = (Polygon) feature.geometry();
                         GeoJsonSource geoJsonSourceParking = new GeoJsonSource(PARKING_SOURCE_ID, parking);
