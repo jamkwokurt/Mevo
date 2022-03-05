@@ -4,7 +4,7 @@ A simple Android app to show vehicles and parking area on the map using Mevo pub
 
 1. Configure Mapbox secret token by adding below to gradle.properties file that could be found in Gradle user home folder (https://docs.gradle.org/current/userguide/directory_layout.html#dir:gradle_user_home for details):
 
-          "MAPBOX_DOWNLOADS_TOKEN=sk.eyJ1IjoiamFta3dvayIsImEiOiJja3ptYnBiMmY1NTU3MnJwcnAyNXhldWdiIn0.kazYZYgldjGL2qLMd1W-VA"
+          "MAPBOX_DOWNLOADS_TOKEN=YOUR_DOWNLOAD_TOKEN"
 
 2. Add dependencies under module level build.gradle:
 
