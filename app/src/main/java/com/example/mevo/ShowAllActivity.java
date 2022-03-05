@@ -25,7 +25,6 @@ import com.example.mevo.data.MevoVehicleData;
 import com.example.mevo.data.MevoParkingResponse;
 import com.example.mevo.data.MevoVehicleResponse;
 import com.example.mevo.network.RetrofitClient;
-import com.example.mevo.utils.ApiFetcher;
 import com.google.gson.JsonObject;
 import com.mapbox.android.core.location.LocationEngine;
 import com.mapbox.android.core.location.LocationEngineCallback;
@@ -71,7 +70,6 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
     private MapboxMap mapboxMap;
     private PermissionsManager permissionsManager;
     private String MAPBOX_ACCESS_TOKEN;
-    private ApiFetcher apiFetcher = new ApiFetcher();
 
     private LocationEngine locationEngine;
     private ShowAllActivityLocationCallback callback =
