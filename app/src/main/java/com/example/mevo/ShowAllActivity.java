@@ -10,6 +10,7 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconSize;
 
 
 import android.annotation.SuppressLint;
+import android.graphics.BitmapFactory;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,9 +21,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.mevo.data.MevoData;
+import com.example.mevo.data.MevoVehicleData;
 import com.example.mevo.data.MevoParkingResponse;
-import com.example.mevo.data.MevoResponse;
+import com.example.mevo.data.MevoVehicleResponse;
 import com.example.mevo.network.RetrofitClient;
 import com.example.mevo.utils.ApiFetcher;
 import com.google.gson.JsonObject;
@@ -46,6 +47,7 @@ import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.mapboxsdk.maps.Style;
 import com.mapbox.mapboxsdk.style.layers.FillLayer;
+import com.mapbox.mapboxsdk.style.layers.LineLayer;
 import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
@@ -142,14 +144,14 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
 
 
     public void getVehiclesSource(Style style) {
-        Call<MevoResponse> call = RetrofitClient.getInstance().getMevoApi().getWellingtonVehicles();
-        call.enqueue(new Callback<MevoResponse>() {
+        Call<MevoVehicleResponse> call = RetrofitClient.getInstance().getMevoApi().getWellingtonVehicles();
+        call.enqueue(new Callback<MevoVehicleResponse>() {
 
             @Override
-            public void onResponse(Call<MevoResponse> call, Response<MevoResponse> response) {
+            public void onResponse(Call<MevoVehicleResponse> call, Response<MevoVehicleResponse> response) {
                 if (response.isSuccessful()) {
-                    MevoResponse mevoResponse = response.body();
-                    MevoData data = mevoResponse.getData();
+                    MevoVehicleResponse mevoResponse = response.body();
+                    MevoVehicleData data = mevoResponse.getData();
 
                     //Edited
                     List<JsonObject> jsonObjects = data.getVehicleFeatures();
@@ -159,33 +161,24 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
                         vehicleFeaturesFromJson.add(vehicle);
                     }
                     FeatureCollection vehicleCollectionFromJson = FeatureCollection.fromFeatures(vehicleFeaturesFromJson);
-                    GeoJsonSource geoJsonSourceVehiclefromJson = new GeoJsonSource(VEHICLE_SOURCE_ID, vehicleCollectionFromJson.toJson());
+                    GeoJsonSource geoJsonSourceVehiclefromJson = new GeoJsonSource(VEHICLE_SOURCE_ID, FeatureCollection.fromFeatures(vehicleFeaturesFromJson));
                     style.addSource(geoJsonSourceVehiclefromJson);
+                    style.addImage("icon", BitmapFactory.decodeResource(
+                            ShowAllActivity.this.getResources(), R.drawable.icon));
                     style.addLayer(new SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
-                            iconImage(vehicleCollectionFromJson.features().get(0).properties().get("iconUrl").getAsString()),
-                            iconSize(1f),
+//                            vehicleCollectionFromJson.features().get(0).properties().get("iconUrl").getAsString()
+                            iconImage("icon"),
+                            iconSize(0.2f),
                             iconAllowOverlap(true),
                             iconIgnorePlacement(true),
                             iconOffset(new Float[]{0f, -7f})
                     ));
                     Log.d("vehicle", "layer added");
-
-//                    //previous
-//                    FeatureCollection vehicleCollection = FeatureCollection.fromJson(data.getVehicleFeatures().toString());
-//                    GeoJsonSource geoJsonSourceVehicle = new GeoJsonSource(VEHICLE_SOURCE_ID, vehicleCollection.toJson());
-//                    style.addSource(geoJsonSourceVehicle);
-//                    style.addLayer(new SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
-//                            iconImage(vehicleCollection.features().get(0).properties().get("iconUrl").getAsString()),
-//                            iconSize(1f),
-//                            iconAllowOverlap(true),
-//                            iconIgnorePlacement(true),
-//                            iconOffset(new Float[]{0f, -7f})
-//                    ));
                 }
             }
 
             @Override
-            public void onFailure(Call<MevoResponse> call, Throwable t) {
+            public void onFailure(Call<MevoVehicleResponse> call, Throwable t) {
                 Toast.makeText(getApplicationContext(), "An error has occured", Toast.LENGTH_LONG).show();
             }
         });
@@ -207,25 +200,23 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
                     style.addSource(geoJsonSourceParkingFromJson);
                     FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_LAYER_ID, PARKING_SOURCE_ID);
                     parkingPolygonFillLayer.setProperties(
-                            PropertyFactory.fillColor(parkingFeatureFromJson.properties().get("fill").getAsString()),
+//                            PropertyFactory.fillColor(parkingFeatureFromJson.properties().get("fill").getAsString()),
+                            PropertyFactory.fillColor("#cfe2f3"),
+
                             PropertyFactory.fillOpacity(Float.parseFloat(parkingFeatureFromJson.properties().get("fill-opacity").getAsString()))
 
                     );
                     parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
+                    LineLayer lineLayer = new LineLayer("parkingLineLayer", PARKING_SOURCE_ID);
+                    lineLayer.setProperties(
+                            PropertyFactory.lineColor("#f7590d"),
+                            PropertyFactory.lineWidth(parkingFeatureFromJson.properties().get("stroke-width").getAsFloat()),
+                            PropertyFactory.lineOpacity(parkingFeatureFromJson.properties().get("stroke-opacity").getAsFloat())
+
+                    );
                     style.addLayer(parkingPolygonFillLayer);
+                    style.addLayer(lineLayer);
                     Log.d("parking", "layer added");
-//                    //previous
-//                    Feature feature = Feature.fromJson(data.getParkingGeometry().toString());
-//                    GeoJsonSource geoJsonSourceParking = new GeoJsonSource(PARKING_SOURCE_ID, feature.toJson());
-//                    style.addSource(geoJsonSourceParking);
-//                    FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_LAYER_ID, PARKING_SOURCE_ID);
-//                    parkingPolygonFillLayer.setProperties(
-//                            PropertyFactory.fillColor(Color.parseColor(feature.properties().get("fill").getAsString())),
-//                            PropertyFactory.fillOpacity(Float.parseFloat(feature.properties().get("fill-opacity").getAsString()))
-//
-//                    );
-//                    parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
-//                    style.addLayer(parkingPolygonFillLayer);
                 } else {
                     System.out.println(response.errorBody());
                 }

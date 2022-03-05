@@ -7,7 +7,7 @@ import com.mapbox.geojson.Feature;
 
 import java.util.List;
 
-public class MevoData {
+public class MevoVehicleData {
     @SerializedName("features")
     List<JsonObject> features;
 
