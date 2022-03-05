@@ -33,7 +33,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public static final String PARKING_SOURCE_ID = "geojson-source-parking";
     public static final String VEHICLE_LAYER_ID = "vehicle-layer";
     public static final String PARKING_LAYER_ID = "parking-layer";
-    private ApiFetcher apiFetcher = new ApiFetcher();
 
 
     @Override
@@ -81,15 +80,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     public void toggleVehicle(){
         Style style = mapboxMap.getStyle();
-        ApiFetcher apiFetcher = new ApiFetcher();
-        apiFetcher.getVehiclesSource(style);
-//        if (style.getLayer(VEHICLE_LAYER_ID) == null) {
-//            ApiFetcher apiFetcher = new ApiFetcher();
-//            apiFetcher.getVehiclesSource(mapboxMap.getStyle());
-//        }else {
-//            style.removeLayer(VEHICLE_LAYER_ID);
-//            style.removeSource(VEHICLE_SOURCE_ID);
-//        }
+        if (style.getLayer(VEHICLE_LAYER_ID) == null) {
+            ApiFetcher apiFetcher = new ApiFetcher();
+            apiFetcher.getVehiclesSource(mapboxMap.getStyle());
+        }else {
+            style.removeLayer(VEHICLE_LAYER_ID);
+            style.removeSource(VEHICLE_SOURCE_ID);
+        }
         Toast.makeText(this, R.string.showVehicles, Toast.LENGTH_LONG).show();
     }
 

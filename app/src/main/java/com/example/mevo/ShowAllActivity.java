@@ -8,8 +8,11 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconImage;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconOffset;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconSize;
 
-import android.graphics.Color;
+
+import android.annotation.SuppressLint;
+import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -18,14 +21,20 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.mevo.data.MevoData;
+import com.example.mevo.data.MevoParkingResponse;
 import com.example.mevo.data.MevoResponse;
-import com.example.mevo.utils.ApiFetcher;
 import com.example.mevo.network.RetrofitClient;
+import com.example.mevo.utils.ApiFetcher;
+import com.google.gson.JsonObject;
+import com.mapbox.android.core.location.LocationEngine;
+import com.mapbox.android.core.location.LocationEngineCallback;
+import com.mapbox.android.core.location.LocationEngineProvider;
+import com.mapbox.android.core.location.LocationEngineRequest;
+import com.mapbox.android.core.location.LocationEngineResult;
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
 import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.FeatureCollection;
-import com.mapbox.geojson.Point;
 import com.mapbox.geojson.Polygon;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.location.LocationComponent;
@@ -41,6 +50,8 @@ import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.List;
 
 import retrofit2.Call;
@@ -48,15 +59,21 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCallback, PermissionsListener {
-    private MapView mapView;
-    private MapboxMap mapboxMap;
-    private PermissionsManager permissionsManager;
-    private String MAPBOX_ACCESS_TOKEN;
     public static final String VEHICLE_SOURCE_ID = "geojson-source-vehicle";
     public static final String PARKING_SOURCE_ID = "geojson-source-parking";
     public static final String VEHICLE_LAYER_ID = "vehicle-layer";
     public static final String PARKING_LAYER_ID = "parking-layer";
+    private static final long DEFAULT_INTERVAL_IN_MILLISECONDS = 1000L;
+    private static final long DEFAULT_MAX_WAIT_TIME = DEFAULT_INTERVAL_IN_MILLISECONDS * 5;
+    private MapView mapView;
+    private MapboxMap mapboxMap;
+    private PermissionsManager permissionsManager;
+    private String MAPBOX_ACCESS_TOKEN;
     private ApiFetcher apiFetcher = new ApiFetcher();
+
+    private LocationEngine locationEngine;
+    private ShowAllActivityLocationCallback callback =
+            new ShowAllActivityLocationCallback(this);
 
 
     @Override
@@ -83,7 +100,7 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
         });
     }
 
-    public void initButtons(){
+    public void initButtons() {
         Button vehiclesBtn = findViewById(R.id.btnV);
         Button parkingBtn = findViewById(R.id.btnP);
         vehiclesBtn.setOnClickListener(new View.OnClickListener() {
@@ -100,23 +117,23 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
         });
     }
 
-    public void toggleVehicle(){
+    public void toggleVehicle() {
         Style style = mapboxMap.getStyle();
 
         if (style.getLayer(VEHICLE_LAYER_ID) == null) {
             this.getVehiclesSource(style);
-        }else {
+        } else {
             style.removeLayer(VEHICLE_LAYER_ID);
             style.removeSource(VEHICLE_SOURCE_ID);
         }
         Toast.makeText(this, R.string.showVehicles, Toast.LENGTH_LONG).show();
     }
 
-    public void toggleParking(){
+    public void toggleParking() {
         Style style = mapboxMap.getStyle();
         if (style.getSource(PARKING_SOURCE_ID) == null) {
             this.getParkingSource(style);
-        }else {
+        } else {
             style.removeLayer(PARKING_LAYER_ID);
             style.removeSource(PARKING_SOURCE_ID);
         }
@@ -133,58 +150,95 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
                 if (response.isSuccessful()) {
                     MevoResponse mevoResponse = response.body();
                     MevoData data = mevoResponse.getData();
-                    FeatureCollection vehicleCollection = FeatureCollection.fromJson(data.getVehicleFeatures().toString());
-                    GeoJsonSource geoJsonSourceVehicle = new GeoJsonSource(VEHICLE_SOURCE_ID, vehicleCollection.toJson());
-                    style.addSource(geoJsonSourceVehicle);
+
+                    //Edited
+                    List<JsonObject> jsonObjects = data.getVehicleFeatures();
+                    List<Feature> vehicleFeaturesFromJson = new ArrayList<>();
+                    for (JsonObject obj : jsonObjects) {
+                        Feature vehicle = Feature.fromJson(obj.toString());
+                        vehicleFeaturesFromJson.add(vehicle);
+                    }
+                    FeatureCollection vehicleCollectionFromJson = FeatureCollection.fromFeatures(vehicleFeaturesFromJson);
+                    GeoJsonSource geoJsonSourceVehiclefromJson = new GeoJsonSource(VEHICLE_SOURCE_ID, vehicleCollectionFromJson.toJson());
+                    style.addSource(geoJsonSourceVehiclefromJson);
                     style.addLayer(new SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
-                            iconImage(vehicleCollection.features().get(0).properties().get("iconUrl").getAsString()),
+                            iconImage(vehicleCollectionFromJson.features().get(0).properties().get("iconUrl").getAsString()),
                             iconSize(1f),
                             iconAllowOverlap(true),
                             iconIgnorePlacement(true),
                             iconOffset(new Float[]{0f, -7f})
                     ));
+                    Log.d("vehicle", "layer added");
+
+//                    //previous
+//                    FeatureCollection vehicleCollection = FeatureCollection.fromJson(data.getVehicleFeatures().toString());
+//                    GeoJsonSource geoJsonSourceVehicle = new GeoJsonSource(VEHICLE_SOURCE_ID, vehicleCollection.toJson());
+//                    style.addSource(geoJsonSourceVehicle);
+//                    style.addLayer(new SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
+//                            iconImage(vehicleCollection.features().get(0).properties().get("iconUrl").getAsString()),
+//                            iconSize(1f),
+//                            iconAllowOverlap(true),
+//                            iconIgnorePlacement(true),
+//                            iconOffset(new Float[]{0f, -7f})
+//                    ));
                 }
             }
 
             @Override
             public void onFailure(Call<MevoResponse> call, Throwable t) {
-                    Toast.makeText(getApplicationContext(), "An error has occured", Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
-    public void getParkingSource(Style style) {
-        Call<MevoResponse> call = RetrofitClient.getInstance().getMevoApi().getWellingtonParking();
-        call.enqueue(new Callback<MevoResponse>() {
-            @Override
-            public void onResponse(@NonNull Call<MevoResponse> call, @NonNull Response<MevoResponse> response) {
-                if (response.isSuccessful()) {
-                    MevoResponse mevoResponse = response.body();
-                    MevoData data = mevoResponse.getData();
-                    Feature feature = Feature.fromJson(data.getParkingGeometry().toString());
-                    GeoJsonSource geoJsonSourceParking = new GeoJsonSource(PARKING_SOURCE_ID, feature.toJson());
-                    style.addSource(geoJsonSourceParking);
-                    FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_LAYER_ID, PARKING_SOURCE_ID);
-                    parkingPolygonFillLayer.setProperties(
-                            PropertyFactory.fillColor(Color.parseColor(feature.properties().get("fill").getAsString())),
-                            PropertyFactory.fillOpacity(Float.parseFloat(feature.properties().get("fill-opacity").getAsString()))
-
-                    );
-                    parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
-                    style.addLayer(parkingPolygonFillLayer);
-                }else {
-                    System.out.println(response.errorBody());
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<MevoResponse> call, Throwable t) {
                 Toast.makeText(getApplicationContext(), "An error has occured", Toast.LENGTH_LONG).show();
             }
         });
     }
 
-    @SuppressWarnings( {"MissingPermission"})
+    public void getParkingSource(Style style) {
+        Call<MevoParkingResponse> call = RetrofitClient.getInstance().getMevoApi().getWellingtonParking();
+        call.enqueue(new Callback<MevoParkingResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<MevoParkingResponse> call, @NonNull Response<MevoParkingResponse> response) {
+                if (response.isSuccessful()) {
+                    MevoParkingResponse mevoResponse = response.body();
+                    JsonObject parkingJsonObject = mevoResponse.getData();
+
+                    //edited
+                    Feature parkingFeatureFromJson = Feature.fromJson(parkingJsonObject.toString());
+                    Polygon polygonParking = (Polygon) parkingFeatureFromJson.geometry();
+                    GeoJsonSource geoJsonSourceParkingFromJson = new GeoJsonSource(PARKING_SOURCE_ID, parkingFeatureFromJson.toJson());
+                    style.addSource(geoJsonSourceParkingFromJson);
+                    FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_LAYER_ID, PARKING_SOURCE_ID);
+                    parkingPolygonFillLayer.setProperties(
+                            PropertyFactory.fillColor(parkingFeatureFromJson.properties().get("fill").getAsString()),
+                            PropertyFactory.fillOpacity(Float.parseFloat(parkingFeatureFromJson.properties().get("fill-opacity").getAsString()))
+
+                    );
+                    parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
+                    style.addLayer(parkingPolygonFillLayer);
+                    Log.d("parking", "layer added");
+//                    //previous
+//                    Feature feature = Feature.fromJson(data.getParkingGeometry().toString());
+//                    GeoJsonSource geoJsonSourceParking = new GeoJsonSource(PARKING_SOURCE_ID, feature.toJson());
+//                    style.addSource(geoJsonSourceParking);
+//                    FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_LAYER_ID, PARKING_SOURCE_ID);
+//                    parkingPolygonFillLayer.setProperties(
+//                            PropertyFactory.fillColor(Color.parseColor(feature.properties().get("fill").getAsString())),
+//                            PropertyFactory.fillOpacity(Float.parseFloat(feature.properties().get("fill-opacity").getAsString()))
+//
+//                    );
+//                    parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
+//                    style.addLayer(parkingPolygonFillLayer);
+                } else {
+                    System.out.println(response.errorBody());
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<MevoParkingResponse> call, Throwable t) {
+                Toast.makeText(getApplicationContext(), "An error has occured", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    @SuppressWarnings({"MissingPermission"})
     private void enableLocationComponent(@NonNull Style loadedMapStyle) {
         // Check if permissions are enabled and if not request
         if (PermissionsManager.areLocationPermissionsGranted(this)) {
@@ -204,10 +258,24 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
 
             // Set the component's render mode
             locationComponent.setRenderMode(RenderMode.COMPASS);
+
+            initLocationEngine();
         } else {
             permissionsManager = new PermissionsManager(this);
             permissionsManager.requestLocationPermissions(this);
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void initLocationEngine() {
+        locationEngine = LocationEngineProvider.getBestLocationEngine(this);
+
+        LocationEngineRequest request = new LocationEngineRequest.Builder(DEFAULT_INTERVAL_IN_MILLISECONDS)
+                .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
+                .setMaxWaitTime(DEFAULT_MAX_WAIT_TIME).build();
+
+        locationEngine.requestLocationUpdates(request, callback, getMainLooper());
+        locationEngine.getLastLocation(callback);
     }
 
     @Override
@@ -238,7 +306,6 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
 
     // Add the mapView lifecycle to the activity's lifecycle methods
     @Override
-    @SuppressWarnings( {"MissingPermission"})
     protected void onStart() {
         super.onStart();
         mapView.onStart();
@@ -278,5 +345,43 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         mapView.onSaveInstanceState(outState);
+    }
+
+    private static class ShowAllActivityLocationCallback
+            implements LocationEngineCallback<LocationEngineResult> {
+
+        private final WeakReference<ShowAllActivity> activityWeakReference;
+
+        ShowAllActivityLocationCallback(ShowAllActivity activity) {
+            this.activityWeakReference = new WeakReference<>(activity);
+        }
+
+        /**
+         * The LocationEngineCallback interface's method which fires when the device's location has changed.
+         *
+         * @param result the LocationEngineResult object which has the last known location within it.
+         */
+        @Override
+        public void onSuccess(LocationEngineResult result) {
+            ShowAllActivity activity = activityWeakReference.get();
+
+            if (activity != null) {
+                List<Location> locations = result.getLocations();
+
+                if (locations == null) {
+                    return;
+                }
+
+                // Pass the new location to the Maps SDK's LocationComponent
+                if (activity.mapboxMap != null && result.getLastLocation() != null) {
+                    activity.mapboxMap.getLocationComponent().forceLocationUpdate(locations, true);
+                }
+            }
+        }
+
+        @Override
+        public void onFailure(@NonNull Exception e) {
+
+        }
     }
 }

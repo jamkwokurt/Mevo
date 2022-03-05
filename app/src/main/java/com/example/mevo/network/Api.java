@@ -1,5 +1,6 @@
 package com.example.mevo.network;
 
+import com.example.mevo.data.MevoParkingResponse;
 import com.example.mevo.data.MevoResponse;
 
 import retrofit2.Call;
@@ -12,5 +13,5 @@ public interface Api {
     @GET(wgnVehicles)
     Call<MevoResponse> getWellingtonVehicles();
     @GET(wgnParking)
-    Call<MevoResponse> getWellingtonParking();
+    Call<MevoParkingResponse> getWellingtonParking();
 }
