@@ -10,7 +10,9 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconSize;
 
 
 import android.annotation.SuppressLint;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
@@ -37,8 +39,11 @@ import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.FeatureCollection;
 import com.mapbox.geojson.Polygon;
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
 import com.mapbox.mapboxsdk.location.LocationComponent;
 import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions;
+import com.mapbox.mapboxsdk.location.OnCameraTrackingChangedListener;
+import com.mapbox.mapboxsdk.location.OnLocationCameraTransitionListener;
 import com.mapbox.mapboxsdk.location.modes.CameraMode;
 import com.mapbox.mapboxsdk.location.modes.RenderMode;
 import com.mapbox.mapboxsdk.maps.MapView;
@@ -50,8 +55,9 @@ import com.mapbox.mapboxsdk.style.layers.LineLayer;
 import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
+import com.squareup.picasso.Picasso;
+import com.squareup.picasso.Target;
 
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,21 +65,29 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCallback, PermissionsListener {
+public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCallback, OnCameraTrackingChangedListener {
     public static final String VEHICLE_SOURCE_ID = "geojson-source-vehicle";
     public static final String PARKING_SOURCE_ID = "geojson-source-parking";
     public static final String VEHICLE_LAYER_ID = "vehicle-layer";
     public static final String PARKING_LAYER_ID = "parking-layer";
     private static final long DEFAULT_INTERVAL_IN_MILLISECONDS = 1000L;
     private static final long DEFAULT_MAX_WAIT_TIME = DEFAULT_INTERVAL_IN_MILLISECONDS * 5;
+    private static final String SAVED_STATE_CAMERA = "saved_state_camera";
+    private static final String SAVED_STATE_RENDER = "saved_state_render";
+    private static final String SAVED_STATE_LOCATION = "saved_state_location";
     private MapView mapView;
     private MapboxMap mapboxMap;
     private PermissionsManager permissionsManager;
     private String MAPBOX_ACCESS_TOKEN;
 
-    private LocationEngine locationEngine;
-    private ShowAllActivityLocationCallback callback =
-            new ShowAllActivityLocationCallback(this);
+    private Location lastLocation;
+    private LocationComponent locationComponent;
+
+    @CameraMode.Mode
+    private int cameraMode = CameraMode.TRACKING;
+
+    @RenderMode.Mode
+    private int renderMode = RenderMode.NORMAL;
 
 
     @Override
@@ -82,38 +96,78 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, MAPBOX_ACCESS_TOKEN);
         setContentView(R.layout.activity_main);
+        // Check and use saved instance state in case of device rotation
+        if (savedInstanceState != null) {
+            cameraMode = savedInstanceState.getInt(SAVED_STATE_CAMERA);
+            renderMode = savedInstanceState.getInt(SAVED_STATE_RENDER);
+            lastLocation = savedInstanceState.getParcelable(SAVED_STATE_LOCATION);
+        }
 
         mapView = findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
-        mapView.getMapAsync(this);
-    }
+        // Check for (and request) the device location permission
+        if (PermissionsManager.areLocationPermissionsGranted(this)) {
+            mapView.getMapAsync(this);
+        } else {
+            permissionsManager = new PermissionsManager(new PermissionsListener() {
+                @Override
+                public void onExplanationNeeded(List<String> permissionsToExplain) {
+                    Toast.makeText(ShowAllActivity.this,
+                            R.string.user_location_permission_explanation, Toast.LENGTH_LONG).show();
+                }
 
+                @Override
+                public void onPermissionResult(boolean granted) {
+                    if (granted) {
+                        mapView.getMapAsync(ShowAllActivity.this);
+                    } else {
+                        finish();
+                    }
+                }
+            });
+            permissionsManager.requestLocationPermissions(this);
+        }
+    }
+    @SuppressLint("MissingPermission")
     @Override
     public void onMapReady(@NonNull MapboxMap mapboxMap) {
         ShowAllActivity.this.mapboxMap = mapboxMap;
-        mapboxMap.setStyle(Style.MAPBOX_STREETS, new Style.OnStyleLoaded() {
-            @Override
-            public void onStyleLoaded(@NonNull Style style) {
-                enableLocationComponent(style);
-                initButtons();
-            }
+        mapboxMap.setStyle(Style.MAPBOX_STREETS, style -> {
+
+            initButtons();
+
+            // Retrieve and customize the Maps SDK's LocationComponent
+            locationComponent = mapboxMap.getLocationComponent();
+            locationComponent.activateLocationComponent(
+                    LocationComponentActivationOptions
+                            .builder(this, style)
+                            .useDefaultLocationEngine(true)
+                            .locationEngineRequest(new LocationEngineRequest.Builder(750)
+                                    .setFastestInterval(750)
+                                    .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
+                                    .build())
+                            .build());
+
+            locationComponent.setLocationComponentEnabled(true);
+            locationComponent.addOnCameraTrackingChangedListener(this);
+            locationComponent.setCameraMode(cameraMode);
         });
     }
 
     public void initButtons() {
         Button vehiclesBtn = findViewById(R.id.btnV);
         Button parkingBtn = findViewById(R.id.btnP);
-        vehiclesBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggleVehicle();
+        vehiclesBtn.setOnClickListener(v -> {
+            if (locationComponent == null) {
+                return;
             }
+            toggleVehicle();
         });
-        parkingBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggleParking();
+        parkingBtn.setOnClickListener(v -> {
+            if (locationComponent == null) {
+                return;
             }
+            toggleParking();
         });
     }
 
@@ -163,6 +217,20 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
                     style.addSource(geoJsonSourceVehiclefromJson);
                     style.addImage("icon", BitmapFactory.decodeResource(
                             ShowAllActivity.this.getResources(), R.drawable.icon));
+//                    Picasso.get().load(vehicleFeaturesFromJson.get(0).properties().get("iconUrl").getAsString()).into(new Target() {
+//                        @Override
+//                        public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
+//                            style.addImage("icon", bitmap);
+//                        }
+//
+//                        @Override
+//                        public void onBitmapFailed(Exception e, Drawable errorDrawable) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onPrepareLoad(Drawable placeHolderDrawable) {}
+//                    });
                     style.addLayer(new SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
 //                            vehicleCollectionFromJson.features().get(0).properties().get("iconUrl").getAsString()
                             iconImage("icon"),
@@ -227,70 +295,10 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
         });
     }
 
-    @SuppressWarnings({"MissingPermission"})
-    private void enableLocationComponent(@NonNull Style loadedMapStyle) {
-        // Check if permissions are enabled and if not request
-        if (PermissionsManager.areLocationPermissionsGranted(this)) {
-
-            // Get an instance of the component
-            LocationComponent locationComponent = mapboxMap.getLocationComponent();
-
-            // Activate with options
-            locationComponent.activateLocationComponent(
-                    LocationComponentActivationOptions.builder(this, loadedMapStyle).build());
-
-            // Enable to make component visible
-            locationComponent.setLocationComponentEnabled(true);
-
-            // Set the component's camera mode
-            locationComponent.setCameraMode(CameraMode.TRACKING);
-
-            // Set the component's render mode
-            locationComponent.setRenderMode(RenderMode.COMPASS);
-
-            initLocationEngine();
-        } else {
-            permissionsManager = new PermissionsManager(this);
-            permissionsManager.requestLocationPermissions(this);
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    private void initLocationEngine() {
-        locationEngine = LocationEngineProvider.getBestLocationEngine(this);
-
-        LocationEngineRequest request = new LocationEngineRequest.Builder(DEFAULT_INTERVAL_IN_MILLISECONDS)
-                .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
-                .setMaxWaitTime(DEFAULT_MAX_WAIT_TIME).build();
-
-        locationEngine.requestLocationUpdates(request, callback, getMainLooper());
-        locationEngine.getLastLocation(callback);
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         permissionsManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
-    }
-
-    @Override
-    public void onExplanationNeeded(List<String> permissionsToExplain) {
-        Toast.makeText(this, R.string.user_location_permission_explanation, Toast.LENGTH_LONG).show();
-    }
-
-    @Override
-    public void onPermissionResult(boolean granted) {
-        if (granted) {
-            mapboxMap.getStyle(new Style.OnStyleLoaded() {
-                @Override
-                public void onStyleLoaded(@NonNull Style style) {
-                    enableLocationComponent(style);
-                }
-            });
-        } else {
-            Toast.makeText(this, R.string.user_location_permission_not_granted, Toast.LENGTH_LONG).show();
-            finish();
-        }
     }
 
     // Add the mapView lifecycle to the activity's lifecycle methods
@@ -334,43 +342,23 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         mapView.onSaveInstanceState(outState);
-    }
 
-    private static class ShowAllActivityLocationCallback
-            implements LocationEngineCallback<LocationEngineResult> {
-
-        private final WeakReference<ShowAllActivity> activityWeakReference;
-
-        ShowAllActivityLocationCallback(ShowAllActivity activity) {
-            this.activityWeakReference = new WeakReference<>(activity);
-        }
-
-        /**
-         * The LocationEngineCallback interface's method which fires when the device's location has changed.
-         *
-         * @param result the LocationEngineResult object which has the last known location within it.
-         */
-        @Override
-        public void onSuccess(LocationEngineResult result) {
-            ShowAllActivity activity = activityWeakReference.get();
-
-            if (activity != null) {
-                List<Location> locations = result.getLocations();
-
-                if (locations == null) {
-                    return;
-                }
-
-                // Pass the new location to the Maps SDK's LocationComponent
-                if (activity.mapboxMap != null && result.getLastLocation() != null) {
-                    activity.mapboxMap.getLocationComponent().forceLocationUpdate(locations, true);
-                }
-            }
-        }
-
-        @Override
-        public void onFailure(@NonNull Exception e) {
-
+        // Save LocationComponent-related settings to use once device rotation is finished
+        outState.putInt(SAVED_STATE_CAMERA, cameraMode);
+        outState.putInt(SAVED_STATE_RENDER, renderMode);
+        if (locationComponent != null) {
+            outState.putParcelable(SAVED_STATE_LOCATION, locationComponent.getLastKnownLocation());
         }
     }
+
+    @Override
+    public void onCameraTrackingDismissed() {
+
+    }
+
+    @Override
+    public void onCameraTrackingChanged(int currentMode) {
+
+    }
+
 }
