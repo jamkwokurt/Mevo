@@ -24,4 +24,4 @@ Screenshots:
 
 ![Screenshot_20220306-204223](https://user-images.githubusercontent.com/90913093/156914028-9a0217c4-b402-449f-ba0b-c045c54adb40.png)
 
-(show vehicles and parkings)
+(show vehicles and parking)
