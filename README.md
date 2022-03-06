@@ -1,6 +1,6 @@
 # Mevo
 
-A simple Android app to show vehicles and parking area on the map using Mevo public API endpoint (https://developer.mevo.co.nz/docs/public/introduction).
+A simple Android app to show vehicles and parking area in Wellington on the map using Mevo public API endpoint (https://developer.mevo.co.nz/docs/public/introduction).
 
 Configure Mapbox secret token by adding below to gradle.properties file at project level or global level (could be found or would need to be created in Gradle user home folder, see https://docs.gradle.org/current/userguide/directory_layout.html#dir:gradle_user_home for details):
 
