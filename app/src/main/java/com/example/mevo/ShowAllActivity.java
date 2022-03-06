@@ -27,7 +27,6 @@ import com.google.gson.JsonObject;
 import com.mapbox.android.core.location.LocationEngineRequest;
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
-import com.mapbox.android.gestures.MoveGestureDetector;
 import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.FeatureCollection;
 import com.mapbox.mapboxsdk.Mapbox;
@@ -56,14 +55,14 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCallback, OnCameraTrackingChangedListener {
-    public static final String VEHICLE_SOURCE_ID = "geojson-source-vehicle";
-    public static final String PARKING_SOURCE_ID = "geojson-source-parking";
-    public static final String VEHICLE_LAYER_ID = "vehicle-layer";
-    public static final String PARKING_FILL_LAYER_ID = "parking-fill-layer";
-    public static final String PARKING_Line_LAYER_ID = "parking-line-layer";
-    private static final String SAVED_STATE_CAMERA = "saved_state_camera";
-    private static final String SAVED_STATE_RENDER = "saved_state_render";
-    private static final String SAVED_STATE_LOCATION = "saved_state_location";
+    public String VEHICLE_SOURCE_ID;
+    public String PARKING_SOURCE_ID;
+    public String VEHICLE_LAYER_ID;
+    public String PARKING_FILL_LAYER_ID;
+    public String PARKING_LINE_LAYER_ID;
+    private String SAVED_STATE_CAMERA;
+    private String SAVED_STATE_RENDER;
+    private String SAVED_STATE_LOCATION;
     private MapView mapView;
     private MapboxMap mapboxMap;
     private PermissionsManager permissionsManager;
@@ -81,6 +80,14 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        VEHICLE_SOURCE_ID = getResources().getString(R.string.vehicle_source_id);
+        PARKING_SOURCE_ID = getResources().getString(R.string.parking_source_id);
+        VEHICLE_LAYER_ID = getResources().getString(R.string.vehicle_layer_id);
+        PARKING_FILL_LAYER_ID = getResources().getString(R.string.parking_fill_layer_id);
+        PARKING_LINE_LAYER_ID = getResources().getString(R.string.parking_line_layer_id);
+        SAVED_STATE_CAMERA = getResources().getString(R.string.saved_state_camera);
+        SAVED_STATE_RENDER = getResources().getString(R.string.saved_state_render);
+        SAVED_STATE_LOCATION = getResources().getString(R.string.saved_state_location);
         MAPBOX_ACCESS_TOKEN = getResources().getString(R.string.mapbox_access_token);
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, MAPBOX_ACCESS_TOKEN);
@@ -184,7 +191,7 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
             this.showParking(style);
         } else {
             style.removeLayer(PARKING_FILL_LAYER_ID);
-            style.removeLayer(PARKING_Line_LAYER_ID);
+            style.removeLayer(PARKING_LINE_LAYER_ID);
             style.removeSource(PARKING_SOURCE_ID);
         }
         Toast.makeText(this, R.string.showParking, Toast.LENGTH_LONG).show();
@@ -250,7 +257,7 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
 
             @Override
             public void onFailure(@NonNull Call<MevoParkingResponse> call, Throwable t) {
-                Toast.makeText(getApplicationContext(), "An error has occured", Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(), ShowAllActivity.this.getResources().getString(R.string.error_message), Toast.LENGTH_LONG).show();
             }
         });
     }
@@ -287,14 +294,14 @@ public class ShowAllActivity extends AppCompatActivity implements OnMapReadyCall
         style.addSource(geoJsonSource);
         FillLayer parkingPolygonFillLayer = new FillLayer(PARKING_FILL_LAYER_ID, PARKING_SOURCE_ID);
         parkingPolygonFillLayer.setProperties(
-                            PropertyFactory.fillColor(feature.properties().get("fill").getAsString()),
+                PropertyFactory.fillColor(feature.properties().get("fill").getAsString()),
                 PropertyFactory.fillOpacity(Float.parseFloat(feature.properties().get("fill-opacity").getAsString()))
 
         );
         parkingPolygonFillLayer.setFilter(eq(literal("$type"), literal("Polygon")));
-        LineLayer lineLayer = new LineLayer(PARKING_Line_LAYER_ID, PARKING_SOURCE_ID);
+        LineLayer lineLayer = new LineLayer(PARKING_LINE_LAYER_ID, PARKING_SOURCE_ID);
         lineLayer.setProperties(
-                PropertyFactory.lineColor("#f7590d"),
+                PropertyFactory.lineColor(feature.properties().get("stroke").getAsString()),
                 PropertyFactory.lineWidth(feature.properties().get("stroke-width").getAsFloat()),
                 PropertyFactory.lineOpacity(feature.properties().get("stroke-opacity").getAsFloat())
 
